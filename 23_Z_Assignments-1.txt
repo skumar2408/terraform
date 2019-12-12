@@ -77,7 +77,7 @@ node {
 
 For testing purpose i have created below destroy script as well.
 node {
-  git 'https://github.com/rgurnule/terraform-docker-service.git'
+  git 'https://github.com/satyensingh/terraform-docker-service.git'
  if(action == 'Deploy') { 
     stage('init') {
       sh label: 'terraform init', script: "terraform init"
