@@ -1,0 +1,541 @@
+Here, we will complete working with Jenkins by creating a pipeline that will create a MySQL Swarm service that uses Docker Secrets.
+
+In the Jenkins dashboard, click New Item Enter an item name of PipelinePart3, and select Pipeline. Click Ok.
+
+Check the box for This project is parameterized. Click Add Parameter and select Choice Parameter. Give it a Name of action. For Choices, enter Deploy and Destroy, and make sure they are on separate lines. Enter The action that will be executed as the Description.
+
+Click Add Parameter and select String Parameter. For the name, enter mysql_root_password.. Enter P4ssW0rd0! in the Default Value box. Enter MySQL root password. as a Description.
+
+For the second parameter, click Add Parameter once more and select String Parameter. For the name, enter mysql_user_password.. Enter paSsw0rd0! in the Default Value box. Enter MySQL user password. as a Description.
+
+Down in the Pipeline section, give a Definition of Pipeline script, and add the following to the Script:
+
+node {
+  git 'https://github.com/satyensingh/terraform-docker-secrets.git'
+  if(action == 'Deploy') {
+    stage('init') {
+      sh label: 'terraform init', script: "terraform init"
+    }
+    stage('plan') {
+      def ROOT_PASSWORD = sh (returnStdout: true, script: """echo ${mysql_root_password} | base64""").trim()
+      def USER_PASSWORD = sh (returnStdout: true, script: """echo ${mysql_user_password} | base64""").trim()
+      sh label: 'terraform plan', script: "terraform plan -out=tfplan -input=false -var mysql_root_password=${ROOT_PASSWORD} -var mysql_db_password=${USER_PASSWORD}"
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+              input(id: "Deploy Gate", message: "Deploy ${params.project_name}?", ok: 'Deploy')
+          }
+      }
+    }
+    stage('apply') {
+      sh label: 'terraform apply', script: "terraform apply -lock=false -input=false tfplan"
+    }
+  }
+
+  if(action == 'Destroy') {
+    stage('plan_destroy') {
+      def ROOT_PASSWORD = sh (returnStdout: true, script: """echo ${mysql_root_password} | base64""").trim()
+      def USER_PASSWORD = sh (returnStdout: true, script: """echo ${mysql_user_password} | base64""").trim()
+      sh label: 'terraform plan', script: "terraform plan -destroy -out=tfdestroyplan -input=false -var mysql_root_password=${ROOT_PASSWORD} -var mysql_db_password=${USER_PASSWORD}"
+    }
+    stage('destroy') {
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+              input(id: "Destroy Gate", message: "Destroy ${params.project_name}?", ok: 'Destroy')
+          }
+      }
+      sh label: 'terraform apply', script: "terraform apply -lock=false -input=false tfdestroyplan"
+    }
+    stage('cleanup') {
+      sh label: 'cleanup', script: "rm -rf terraform.tfstat"
+    }
+  }
+}
+Click Save
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Jenkins Log:-
+
+-----------------
+In Case Of deploy:-
+
+Started by user Admin
+Running in Durability level: MAX_SURVIVABILITY
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/jenkins_home/workspace/PipelinePart3
+[Pipeline] {
+[Pipeline] git
+No credentials specified
+ > git rev-parse --is-inside-work-tree # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://github.com/satyensingh/terraform-docker-secrets.git # timeout=10
+Fetching upstream changes from https://github.com/satyensingh/terraform-docker-secrets.git
+ > git --version # timeout=10
+ > git fetch --tags --progress -- https://github.com/satyensingh/terraform-docker-secrets.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
+ > git rev-parse refs/remotes/origin/origin/master^{commit} # timeout=10
+Checking out Revision 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 (refs/remotes/origin/master)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git branch -D master # timeout=10
+ > git checkout -b master 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 # timeout=10
+Commit message: "Create volumes.tf"
+ > git rev-list --no-walk 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 # timeout=10
+[Pipeline] stage
+[Pipeline] { (init)
+[Pipeline] sh (terraform init)
++ terraform init
+
+[0m[1mInitializing provider plugins...[0m
+
+The following providers do not have any version constraints in configuration,
+so the latest version was installed.
+
+To prevent automatic upgrades to new major versions that may contain breaking
+changes, it is recommended to add version = "..." constraints to the
+corresponding provider blocks in configuration, with the constraint strings
+suggested below.
+
+* provider.docker: version = "~> 2.6"
+
+[0m[1m[32mTerraform has been successfully initialized![0m[32m[0m
+[0m[32m
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (plan)
+[Pipeline] sh
++ base64
++ echo P4ssW0rd0!
+[Pipeline] sh
++ base64
++ echo paSsw0rd0!
+[Pipeline] sh (terraform plan)
++ terraform plan -out=tfplan -input=false -var mysql_root_password=UDRzc1cwcmQwIQo= -var mysql_db_password=cGFTc3cwcmQwIQo=
+[0m[1mRefreshing Terraform state in-memory prior to plan...[0m
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+[0m
+[0m[1mdocker_volume.mysql_data_volume: Refreshing state... (ID: secrets_mysql_data)[0m
+
+------------------------------------------------------------------------
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  [32m+[0m create
+[0m
+Terraform will perform the following actions:
+
+[32m  [32m+[0m [32mdocker_network.private_bridge_network
+[0m      id:                                                              <computed>
+      driver:                                                          "overlay"
+      internal:                                                        "true"
+      ipam_config.#:                                                   <computed>
+      ipam_driver:                                                     "default"
+      name:                                                            "secrets_mysql_internal"
+      options.%:                                                       <computed>
+      scope:                                                           <computed>
+[0m
+[0m[32m  [32m+[0m [32mdocker_secret.mysql_db_password
+[0m      id:                                                              <computed>
+      data:                                                            <sensitive>
+      name:                                                            "db_password"
+[0m
+[0m[32m  [32m+[0m [32mdocker_secret.mysql_root_password
+[0m      id:                                                              <computed>
+      data:                                                            <sensitive>
+      name:                                                            "root_password"
+[0m
+[0m[32m  [32m+[0m [32mdocker_service.mysql-service
+[0m      id:                                                              <computed>
+      endpoint_spec.#:                                                 <computed>
+      labels.%:                                                        <computed>
+      mode.#:                                                          <computed>
+      name:                                                            "db"
+      task_spec.#:                                                     "1"
+      task_spec.0.container_spec.#:                                    "1"
+      task_spec.0.container_spec.0.dns_config.#:                       <computed>
+      task_spec.0.container_spec.0.env.%:                              "3"
+      task_spec.0.container_spec.0.env.MYSQL_DATABASE:                 "wordpress"
+      task_spec.0.container_spec.0.env.MYSQL_PASSWORD_FILE:            "/run/secrets/db_password"
+      task_spec.0.container_spec.0.env.MYSQL_ROOT_PASSWORD_FILE:       "/run/secrets/root_password"
+      task_spec.0.container_spec.0.healthcheck.#:                      <computed>
+      task_spec.0.container_spec.0.image:                              "mysql:5.7"
+      task_spec.0.container_spec.0.isolation:                          "default"
+      task_spec.0.container_spec.0.mounts.#:                           "1"
+      task_spec.0.container_spec.0.mounts.1680514631.bind_options.#:   "0"
+      task_spec.0.container_spec.0.mounts.1680514631.read_only:        ""
+      task_spec.0.container_spec.0.mounts.1680514631.source:           "secrets_mysql_data"
+      task_spec.0.container_spec.0.mounts.1680514631.target:           "/var/lib/mysql"
+      task_spec.0.container_spec.0.mounts.1680514631.tmpfs_options.#:  "0"
+      task_spec.0.container_spec.0.mounts.1680514631.type:             "volume"
+      task_spec.0.container_spec.0.mounts.1680514631.volume_options.#: "0"
+      task_spec.0.container_spec.0.secrets.#:                          "2"
+      task_spec.0.container_spec.0.secrets.~2269179753.file_name:      "/run/secrets/db_password"
+      task_spec.0.container_spec.0.secrets.~2269179753.secret_id:      "${docker_secret.mysql_db_password.id}"
+      task_spec.0.container_spec.0.secrets.~2269179753.secret_name:    "db_password"
+      task_spec.0.container_spec.0.secrets.~42500167.file_name:        "/run/secrets/root_password"
+      task_spec.0.container_spec.0.secrets.~42500167.secret_id:        "${docker_secret.mysql_root_password.id}"
+      task_spec.0.container_spec.0.secrets.~42500167.secret_name:      "root_password"
+      task_spec.0.container_spec.0.stop_grace_period:                  <computed>
+      task_spec.0.force_update:                                        <computed>
+      task_spec.0.networks.#:                                          "1"
+      task_spec.0.networks.1111985580:                                 "secrets_mysql_internal"
+      task_spec.0.placement.#:                                         <computed>
+      task_spec.0.resources.#:                                         <computed>
+      task_spec.0.restart_policy.%:                                    <computed>
+      task_spec.0.runtime:                                             <computed>
+[0m
+[0m
+[0m[1mPlan:[0m 4 to add, 0 to change, 0 to destroy.[0m
+
+------------------------------------------------------------------------
+
+This plan was saved to: tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfplan"
+
+[Pipeline] script
+[Pipeline] {
+[Pipeline] timeout
+Timeout set to expire in 10 min
+[Pipeline] {
+[Pipeline] input
+Deploy null?
+Deploy or Abort
+Approved by Admin
+[Pipeline] }
+[Pipeline] // timeout
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (apply)
+[Pipeline] sh (terraform apply)
++ terraform apply -lock=false -input=false tfplan
+[0m[1mdocker_network.private_bridge_network: Creating...[0m
+  driver:        "" => "overlay"
+  internal:      "" => "true"
+  ipam_config.#: "" => "<computed>"
+  ipam_driver:   "" => "default"
+  name:          "" => "secrets_mysql_internal"
+  options.%:     "" => "<computed>"
+  scope:         "" => "<computed>"[0m
+[0m[1mdocker_secret.mysql_root_password: Creating...[0m
+  data: "<sensitive>" => "<sensitive>"
+  name: "" => "root_password"[0m
+[0m[1mdocker_secret.mysql_db_password: Creating...[0m
+  data: "<sensitive>" => "<sensitive>"
+  name: "" => "db_password"[0m
+[0m[1mdocker_secret.mysql_db_password: Creation complete after 0s (ID: 6f1u4mpw7hw0fq8w75dh0ptkv)[0m[0m
+[0m[1mdocker_secret.mysql_root_password: Creation complete after 0s (ID: 92vrrqg7f6abun4aigi484nzl)[0m[0m
+[0m[1mdocker_network.private_bridge_network: Creation complete after 2s (ID: syjl85vzbvhmo6756nu3cf71d)[0m[0m
+[0m[1mdocker_service.mysql-service: Creating...[0m
+  endpoint_spec.#:                                                 "" => "<computed>"
+  labels.%:                                                        "" => "<computed>"
+  mode.#:                                                          "" => "<computed>"
+  name:                                                            "" => "db"
+  task_spec.#:                                                     "" => "1"
+  task_spec.0.container_spec.#:                                    "" => "1"
+  task_spec.0.container_spec.0.dns_config.#:                       "" => "<computed>"
+  task_spec.0.container_spec.0.env.%:                              "" => "3"
+  task_spec.0.container_spec.0.env.MYSQL_DATABASE:                 "" => "wordpress"
+  task_spec.0.container_spec.0.env.MYSQL_PASSWORD_FILE:            "" => "/run/secrets/db_password"
+  task_spec.0.container_spec.0.env.MYSQL_ROOT_PASSWORD_FILE:       "" => "/run/secrets/root_password"
+  task_spec.0.container_spec.0.healthcheck.#:                      "" => "<computed>"
+  task_spec.0.container_spec.0.image:                              "" => "mysql:5.7"
+  task_spec.0.container_spec.0.isolation:                          "" => "default"
+  task_spec.0.container_spec.0.mounts.#:                           "" => "1"
+  task_spec.0.container_spec.0.mounts.1680514631.bind_options.#:   "" => "0"
+  task_spec.0.container_spec.0.mounts.1680514631.read_only:        "" => ""
+  task_spec.0.container_spec.0.mounts.1680514631.source:           "" => "secrets_mysql_data"
+  task_spec.0.container_spec.0.mounts.1680514631.target:           "" => "/var/lib/mysql"
+  task_spec.0.container_spec.0.mounts.1680514631.tmpfs_options.#:  "" => "0"
+  task_spec.0.container_spec.0.mounts.1680514631.type:             "" => "volume"
+  task_spec.0.container_spec.0.mounts.1680514631.volume_options.#: "" => "0"
+  task_spec.0.container_spec.0.secrets.#:                          "" => "2"
+  task_spec.0.container_spec.0.secrets.166759213.file_name:        "" => "/run/secrets/root_password"
+  task_spec.0.container_spec.0.secrets.166759213.secret_id:        "" => "92vrrqg7f6abun4aigi484nzl"
+  task_spec.0.container_spec.0.secrets.166759213.secret_name:      "" => "root_password"
+  task_spec.0.container_spec.0.secrets.3662720269.file_name:       "" => "/run/secrets/db_password"
+  task_spec.0.container_spec.0.secrets.3662720269.secret_id:       "" => "6f1u4mpw7hw0fq8w75dh0ptkv"
+  task_spec.0.container_spec.0.secrets.3662720269.secret_name:     "" => "db_password"
+  task_spec.0.container_spec.0.stop_grace_period:                  "" => "<computed>"
+  task_spec.0.force_update:                                        "" => "<computed>"
+  task_spec.0.networks.#:                                          "" => "1"
+  task_spec.0.networks.1111985580:                                 "" => "secrets_mysql_internal"
+  task_spec.0.placement.#:                                         "" => "<computed>"
+  task_spec.0.resources.#:                                         "" => "<computed>"
+  task_spec.0.restart_policy.%:                                    "" => "<computed>"
+  task_spec.0.runtime:                                             "" => "<computed>"[0m
+[0m[1mdocker_service.mysql-service: Creation complete after 7s (ID: 26975ob63s796jvjdxm72zf4c)[0m[0m
+[0m[1m[32m
+Apply complete! Resources: 4 added, 0 changed, 0 destroyed.[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS
+
+----------------------------------------------------------------------------------------------------------------
+--To List out the service
+
+ubuntu@ip-172-31-38-20:~/jenkins$ docker service ls
+ID                  NAME                MODE                REPLICAS            IMAGE               PORTS
+26975ob63s79        db                  replicated          1/1                 mysql:5.
+-----------------------------------------------------------------------------------------------------------------
+--To Inspect out The db Service
+
+ubuntu@ip-172-31-38-20:~/jenkins$ docker service inspect db
+[
+    {
+        "ID": "26975ob63s796jvjdxm72zf4c",
+        "Version": {
+            "Index": 21
+        },
+        "CreatedAt": "2019-12-11T20:02:44.883409756Z",
+        "UpdatedAt": "2019-12-11T20:02:44.884887743Z",
+        "Spec": {
+            "Name": "db",
+            "Labels": {},
+            "TaskTemplate": {
+                "ContainerSpec": {
+                    "Image": "mysql:5.7@sha256:5779c71a4730da36f013a23a437b5831198e68e634575f487d37a0639470e3a8",
+                    "Env": [
+                        "MYSQL_PASSWORD_FILE=/run/secrets/db_password",
+                        "MYSQL_DATABASE=wordpress",
+                        "MYSQL_ROOT_PASSWORD_FILE=/run/secrets/root_password"
+                    ],
+                    "Mounts": [
+                        {
+                            "Type": "volume",
+                            "Source": "secrets_mysql_data",
+                            "Target": "/var/lib/mysql"
+                        }
+                    ],
+                    "StopGracePeriod": 0,
+                    "Healthcheck": {},
+                    "DNSConfig": {},
+                    "Secrets": [
+                        {
+                            "File": {
+                                "Name": "/run/secrets/root_password",
+                                "UID": "0",
+                                "GID": "0",
+                                "Mode": 292
+                            },
+                            "SecretID": "92vrrqg7f6abun4aigi484nzl",
+                            "SecretName": "root_password"
+                        },
+                        {
+                            "File": {
+                                "Name": "/run/secrets/db_password",
+                                "UID": "0",
+                                "GID": "0",
+                                "Mode": 292
+                            },
+                            "SecretID": "6f1u4mpw7hw0fq8w75dh0ptkv",
+                            "SecretName": "db_password"
+                        }
+                    ],
+                    "Isolation": "default"
+                },
+                "Resources": {},
+                "RestartPolicy": {
+                    "Condition": "any",
+                    "Delay": 5000000000,
+                    "MaxAttempts": 0
+                },
+                "Placement": {
+                    "Platforms": [
+                        {
+                            "Architecture": "amd64",
+                            "OS": "linux"
+                        }
+                    ]
+                },
+                "Networks": [
+                    {
+                        "Target": "syjl85vzbvhmo6756nu3cf71d"
+                    }
+                ],
+                "ForceUpdate": 0,
+                "Runtime": "container"
+            },
+            "Mode": {
+                "Replicated": {
+                    "Replicas": 1
+                }
+            },
+            "UpdateConfig": {
+                "Parallelism": 1,
+                "FailureAction": "pause",
+                "Monitor": 5000000000,
+                "MaxFailureRatio": 0,
+                "Order": "stop-first"
+            },
+            "RollbackConfig": {
+                "Parallelism": 1,
+                "FailureAction": "pause",
+                "Monitor": 5000000000,
+                "MaxFailureRatio": 0,
+                "Order": "stop-first"
+            },
+            "EndpointSpec": {
+                "Mode": "vip"
+            }
+        },
+        "Endpoint": {
+            "Spec": {
+                "Mode": "vip"
+            },
+            "VirtualIPs": [
+                {
+                    "NetworkID": "syjl85vzbvhmo6756nu3cf71d",
+                    "Addr": "10.0.1.2/24"
+                }
+            ]
+        }
+    }
+]
+---------------------------------------------------------------------------------------------------------------
+
+In case Of destroy:-
+
+
+Started by user Admin
+Running in Durability level: MAX_SURVIVABILITY
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/jenkins_home/workspace/PipelinePart3
+[Pipeline] {
+[Pipeline] git
+No credentials specified
+ > git rev-parse --is-inside-work-tree # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://github.com/satyensingh/terraform-docker-secrets.git # timeout=10
+Fetching upstream changes from https://github.com/satyensingh/terraform-docker-secrets.git
+ > git --version # timeout=10
+ > git fetch --tags --progress -- https://github.com/satyensingh/terraform-docker-secrets.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
+ > git rev-parse refs/remotes/origin/origin/master^{commit} # timeout=10
+Checking out Revision 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 (refs/remotes/origin/master)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git branch -D master # timeout=10
+ > git checkout -b master 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 # timeout=10
+Commit message: "Create volumes.tf"
+ > git rev-list --no-walk 8ab2b05771ea92d6e1fcd4f20c4ab0c259e45b10 # timeout=10
+[Pipeline] stage
+[Pipeline] { (plan_destroy)
+[Pipeline] sh
++ base64
++ echo P4ssW0rd0!
+[Pipeline] sh
++ base64
++ echo paSsw0rd0!
+[Pipeline] sh (terraform plan)
++ terraform plan -destroy -out=tfdestroyplan -input=false -var mysql_root_password=UDRzc1cwcmQwIQo= -var mysql_db_password=cGFTc3cwcmQwIQo=
+[0m[1mRefreshing Terraform state in-memory prior to plan...[0m
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+[0m
+[0m[1mdocker_network.private_bridge_network: Refreshing state... (ID: syjl85vzbvhmo6756nu3cf71d)[0m
+[0m[1mdocker_secret.mysql_root_password: Refreshing state... (ID: 92vrrqg7f6abun4aigi484nzl)[0m
+[0m[1mdocker_volume.mysql_data_volume: Refreshing state... (ID: secrets_mysql_data)[0m
+[0m[1mdocker_secret.mysql_db_password: Refreshing state... (ID: 6f1u4mpw7hw0fq8w75dh0ptkv)[0m
+[0m[1mdocker_service.mysql-service: Refreshing state... (ID: 26975ob63s796jvjdxm72zf4c)[0m
+
+------------------------------------------------------------------------
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  [31m-[0m destroy
+[0m
+Terraform will perform the following actions:
+
+[31m  [31m-[0m [31mdocker_network.private_bridge_network
+[0m[0m
+[0m[31m  [31m-[0m [31mdocker_secret.mysql_db_password
+[0m[0m
+[0m[31m  [31m-[0m [31mdocker_secret.mysql_root_password
+[0m[0m
+[0m[31m  [31m-[0m [31mdocker_service.mysql-service
+[0m[0m
+[0m[31m  [31m-[0m [31mdocker_volume.mysql_data_volume
+[0m[0m
+[0m
+[0m[1mPlan:[0m 0 to add, 0 to change, 5 to destroy.[0m
+
+------------------------------------------------------------------------
+
+This plan was saved to: tfdestroyplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfdestroyplan"
+
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (destroy)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] timeout
+Timeout set to expire in 10 min
+[Pipeline] {
+[Pipeline] input
+Destroy null?
+Destroy or Abort
+Approved by Admin
+[Pipeline] }
+[Pipeline] // timeout
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] sh (terraform apply)
++ terraform apply -lock=false -input=false tfdestroyplan
+[0m[1mdocker_service.mysql-service: Destroying... (ID: 26975ob63s796jvjdxm72zf4c)[0m[0m
+[0m[1mdocker_service.mysql-service: Destruction complete after 0s[0m[0m
+[0m[1mdocker_secret.mysql_db_password: Destroying... (ID: 6f1u4mpw7hw0fq8w75dh0ptkv)[0m[0m
+[0m[1mdocker_network.private_bridge_network: Destroying... (ID: syjl85vzbvhmo6756nu3cf71d)[0m[0m
+[0m[1mdocker_volume.mysql_data_volume: Destroying... (ID: secrets_mysql_data)[0m[0m
+[0m[1mdocker_secret.mysql_root_password: Destroying... (ID: 92vrrqg7f6abun4aigi484nzl)[0m[0m
+[0m[1mdocker_secret.mysql_db_password: Destruction complete after 0s[0m[0m
+[0m[1mdocker_secret.mysql_root_password: Destruction complete after 0s[0m[0m
+[0m[1mdocker_volume.mysql_data_volume: Destruction complete after 2s[0m[0m
+[0m[1mdocker_network.private_bridge_network: Destruction complete after 2s[0m[0m
+[0m[1m[32m
+Apply complete! Resources: 0 added, 0 changed, 5 destroyed.[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (cleanup)
+[Pipeline] sh (cleanup)
++ rm -rf terraform.tfstat
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS
+---------------------------------------------
+----------after destroy section
+
+ubuntu@ip-172-31-38-20:~/jenkins$ docker service ls
+ID                  NAME                MODE                REPLICAS            IMAGE               PORTS
+
+
+
+

@@ -1,0 +1,234 @@
+Here, we will create the first Jenkins Pipeline that will deploy out a Ghost blog.
+
+In the Jenkins dashboard, click New Item Enter an item name of PipelinePart1, and select Pipeline. Click Ok.
+
+Check the box for This project is parameterized. Click Add Parameter and select Choice Parameter. Give it a Name of action. For Choices, enter Deploy and Destroy, and make sure they are on separate lines. Enter The action that will be executed as the Description.
+
+Click Add Parameter and select Choice Parameter again. This time, name it image_name. Enter ghost:latest and ghost:alpine in the Choices box, making sure they are on separate lines. Enter The image Ghost Blog will deploy as a Description.
+
+Click Add Parameter a third time, and select String Parameter. Give it a Name of ext_port. Set the Default Value to 80. Enter The Public Port as the Description.
+
+Down in the Pipeline section, give a Definition of Pipeline script, and add the following to the Script:
+
+node {
+  git 'https://github.com/satyensingh/terraform-docker.git'
+  if(action == 'Deploy') {
+    stage('init') {
+        sh """
+            terraform init
+        """
+    }
+    stage('plan') {
+      sh label: 'terraform plan', script: "terraform plan -out=tfplan -input=false -var image_name=${image_name} -var ext_port=${ext_port}"
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+              input(id: "Deploy Gate", message: "Deploy environment?", ok: 'Deploy')
+          }
+      }
+    }
+    stage('apply') {
+        sh label: 'terraform apply', script: "terraform apply -lock=false -input=false tfplan"
+    }
+  }
+
+  if(action == 'Destroy') {
+    stage('plan_destroy') {
+      sh label: 'terraform plan destroy', script: "terraform plan -destroy -out=tfdestroyplan -input=false -var image_name=${image_name} -var ext_port=${ext_port}"
+    }
+    stage('destroy') {
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+              input(id: "Destroy Gate", message: "Destroy environment?", ok: 'Destroy')
+          }
+      }
+      sh label: 'Destroy environment', script: "terraform apply -lock=false -input=false tfdestroyplan"
+    }
+  }
+}
+Click Save
+-------------------------------------------------------------------------------------------
+
+
+jenkins Log
+
+In Case Of Deploy:-
+
+Started by user Admin
+Running in Durability level: MAX_SURVIVABILITY
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/jenkins_home/workspace/PipelinePart1
+[Pipeline] {
+[Pipeline] git
+No credentials specified
+Cloning the remote Git repository
+Cloning repository https://github.com/satyensingh/terraform-docker.git
+ > git init /var/jenkins_home/workspace/PipelinePart1 # timeout=10
+Fetching upstream changes from https://github.com/satyensingh/terraform-docker.git
+ > git --version # timeout=10
+ > git fetch --tags --progress -- https://github.com/satyensingh/terraform-docker.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin.url https://github.com/satyensingh/terraform-docker.git # timeout=10
+ > git config --add remote.origin.fetch +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin.url https://github.com/satyensingh/terraform-docker.git # timeout=10
+Fetching upstream changes from https://github.com/satyensingh/terraform-docker.git
+ > git fetch --tags --progress -- https://github.com/satyensingh/terraform-docker.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
+ > git rev-parse refs/remotes/origin/origin/master^{commit} # timeout=10
+Checking out Revision 29e47513861721d25eff749168dd2fae488cafcf (refs/remotes/origin/master)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 29e47513861721d25eff749168dd2fae488cafcf # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git checkout -b master 29e47513861721d25eff749168dd2fae488cafcf # timeout=10
+Commit message: "Update variables.tf"
+First time build. Skipping changelog.
+[Pipeline] stage
+[Pipeline] { (init)
+[Pipeline] sh
++ terraform init
+
+[0m[1mInitializing provider plugins...[0m
+- Checking for available provider plugins on https://releases.hashicorp.com...
+- Downloading plugin for provider "docker" (2.6.0)...
+
+The following providers do not have any version constraints in configuration,
+so the latest version was installed.
+
+To prevent automatic upgrades to new major versions that may contain breaking
+changes, it is recommended to add version = "..." constraints to the
+corresponding provider blocks in configuration, with the constraint strings
+suggested below.
+
+* provider.docker: version = "~> 2.6"
+
+[0m[1m[32mTerraform has been successfully initialized![0m[32m[0m
+[0m[32m
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (plan)
+[Pipeline] sh (terraform plan)
++ terraform plan -out=tfplan -input=false -var image_name=ghost:latest -var ext_port=80
+[0m[1mRefreshing Terraform state in-memory prior to plan...[0m
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+[0m
+
+------------------------------------------------------------------------
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  [32m+[0m create
+[0m
+Terraform will perform the following actions:
+
+[32m  [32m+[0m [32mdocker_container.container_id
+[0m      id:               <computed>
+      attach:           "false"
+      bridge:           <computed>
+      container_logs:   <computed>
+      exit_code:        <computed>
+      gateway:          <computed>
+      image:            "${docker_image.image_id.latest}"
+      ip_address:       <computed>
+      ip_prefix_length: <computed>
+      log_driver:       "json-file"
+      logs:             "false"
+      must_run:         "true"
+      name:             "ghost_blog"
+      network_data.#:   <computed>
+      ports.#:          "1"
+      ports.0.external: "80"
+      ports.0.internal: "2368"
+      ports.0.ip:       "0.0.0.0"
+      ports.0.protocol: "tcp"
+      read_only:        "false"
+      restart:          "no"
+      rm:               "false"
+      start:            "true"
+[0m
+[0m[32m  [32m+[0m [32mdocker_image.image_id
+[0m      id:               <computed>
+      latest:           <computed>
+      name:             "ghost:latest"
+[0m
+[0m
+[0m[1mPlan:[0m 2 to add, 0 to change, 0 to destroy.[0m
+
+------------------------------------------------------------------------
+
+This plan was saved to: tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfplan"
+
+[Pipeline] script
+[Pipeline] {
+[Pipeline] timeout
+Timeout set to expire in 10 min
+[Pipeline] {
+[Pipeline] input
+Deploy environment?
+Deploy or Abort
+Approved by Admin
+[Pipeline] }
+[Pipeline] // timeout
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (apply)
+[Pipeline] sh (terraform apply)
++ terraform apply -lock=false -input=false tfplan
+[0m[1mdocker_image.image_id: Creating...[0m
+  latest: "" => "<computed>"
+  name:   "" => "ghost:latest"[0m
+[0m[1mdocker_image.image_id: Still creating... (10s elapsed)[0m[0m
+[0m[1mdocker_image.image_id: Still creating... (20s elapsed)[0m[0m
+[0m[1mdocker_image.image_id: Creation complete after 29s (ID: sha256:eadda45eb5e4c4dde5ef2bbb16f7e675...e6fab6025f44fe1c214a5efc6eghost:latest)[0m[0m
+[0m[1mdocker_container.container_id: Creating...[0m
+  attach:           "" => "false"
+  bridge:           "" => "<computed>"
+  container_logs:   "" => "<computed>"
+  exit_code:        "" => "<computed>"
+  gateway:          "" => "<computed>"
+  image:            "" => "sha256:eadda45eb5e4c4dde5ef2bbb16f7e6754183d4e6fab6025f44fe1c214a5efc6e"
+  ip_address:       "" => "<computed>"
+  ip_prefix_length: "" => "<computed>"
+  log_driver:       "" => "json-file"
+  logs:             "" => "false"
+  must_run:         "" => "true"
+  name:             "" => "ghost_blog"
+  network_data.#:   "" => "<computed>"
+  ports.#:          "" => "1"
+  ports.0.external: "" => "80"
+  ports.0.internal: "" => "2368"
+  ports.0.ip:       "" => "0.0.0.0"
+  ports.0.protocol: "" => "tcp"
+  read_only:        "" => "false"
+  restart:          "" => "no"
+  rm:               "" => "false"
+  start:            "" => "true"[0m
+[0m[1mdocker_container.container_id: Creation complete after 6s (ID: 5f7bea4ad4b127240128a755d1b7b18d6f1d09f03c1596081c434654d12b1b7a)[0m[0m
+[0m[1m[32m
+Apply complete! Resources: 2 added, 0 changed, 0 destroyed.[0m
+[0m[1m[32m
+Outputs:
+
+container_name = ghost_blog
+ip = 172.17.0.3[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS
+
+
