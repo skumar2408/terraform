@@ -1,0 +1,1540 @@
+Building a CI/CD Pipeline Using Terraform:
+
+Go to http://:8080 and complete the Jenkins setup. From the command line of the Jenkins server, run the following command to get the password:
+
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+Install the default plugins.
+Create a Jenkins user account.
+
+Create a Pipeline to deploy for a Docker Service
+Click New Item and select Pipeline.
+Name the project MyDeployment.
+Ensure that the project is parameterized.
+Create two choice parameters: image_name and ghost_ext_port.
+The choices for image_name should be set to ghost:latest and ghost:alpine.
+The choices for ghost_ext_port should be set to 80 and 8081.
+
+The Pipeline
+The pipeline should clone the following Git repository:
+https://github.com/satyensingh/terraform-docker-service.git
+
+
+Running the Terraform commands requires supplying the path to the binary: /usr/local/bin/terraform.
+Create a three stage pipeline: init, plan, and apply.
+For the init stage, use a shell script sh to initialize Terraform. Set the label to Initialize Terraform.
+
+For the plan stage, use a shell script sh to generate a Terraform plan. Set the label to Plan Terraform.
+The Terraform plan should do the following:
+
+Create a plan file called deploy_service to be used with the apply.
+Ensure that the plan is not prompted for inputs.
+Pass in the variables image_name and ghost_ext_port and set them to their corresponding parameters.
+Using a script, create a timeout and input.
+The timeout should be for 10 minutes.
+The input should have an id of Deploy Gate, a message that states Deploy environment? and ok of Deploy.
+
+For the apply stage, use a shell script sh to execute terraform apply.
+Set the label to Deploy Infrastructure. The terraform apply should do the following:
+
+Set locking to false.
+Ensure that the apply is not prompted for inputs.
+Use the deploy_service plan file created during the plan stage.
+
+Test the job
+From MyDeployment click Build with Parameters.
+Select ghost:alpine for the image_name and 8081 for ghost_ext_port.
+Click the Build button. In the Build History click on the job number.
+Then click on Console Output.
+The job will be paused and you need to either click on Deploy or Abort.
+Click Deploy so that the job can resume.
+Visit: http://[PUBLIC_IP]:8081 to see if Ghost blog pulls up.
+
+============================================================================================================================================================================================================
+
+Created script as per requirment:- 
+
+node {
+  git 'https://github.com/satyensingh/terraform-docker-service.git'
+ 
+    stage('init') {
+      sh label: 'terraform init', script: "terraform init"
+    }
+    stage('plan') {
+      sh label: 'terraform plan', script: "terraform plan -out=deploy_service -input=false -var ghost_image=${ghost_image} -var ghost_ext_port=${ghost_ext_port}"
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+            input(id: "Deploy Gate", message: "Deploy environment?", ok: 'Deploy')
+          }
+      }
+    }
+    stage('apply') {
+      sh label: 'Deploy Infrastructure', script: "terraform apply -lock=false -input=false deploy_service"
+    }
+    stage('show') {
+      sh label: 'terraform show', script: "terraform show"
+    }
+}
+
+For testing purpose i have created below destroy script as well.
+node {
+  git 'https://github.com/rgurnule/terraform-docker-service.git'
+ if(action == 'Deploy') { 
+    stage('init') {
+      sh label: 'terraform init', script: "terraform init"
+    }
+    stage('plan') {
+      sh label: 'terraform plan', script: "terraform plan -out=deploy_service -input=false -var ghost_image=${ghost_image} -var ghost_ext_port=${ghost_ext_port}"
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+            input(id: "Deploy Gate", message: "Deploy environment?", ok: 'Deploy')
+          }
+      }
+    }
+    stage('apply') {
+      sh label: 'Deploy Infrastructure', script: "terraform apply -lock=false -input=false deploy_service"
+    }
+    stage('show') {
+      sh label: 'terraform show', script: "terraform show"
+    }
+}
+
+if(action == 'Destroy') {
+    stage('plan_destroy') {
+      sh label: 'terraform plan', script: "terraform plan -destroy -out=tfdestroyplan -input=false -var ghost_image=${ghost_image} -var ghost_ext_port=${ghost_ext_port}"
+    }
+    stage('destroy') {
+      script {
+          timeout(time: 10, unit: 'MINUTES') {
+              input(id: "Destroy Gate", message: "Destroy environment?", ok: 'Destroy')
+          }
+      }
+      sh label: 'terraform apply', script: "terraform apply -lock=false -input=false tfdestroyplan"
+    }
+    stage('cleanup') {
+      sh label: 'cleanup', script: "rm -rf terraform.tfstat"
+    }
+  }
+}  
+
+
+**************************************************JENKINS LOGS Starts for Deploy *************************************************************************************************************************
+
+  Started by user admin
+Running in Durability level: MAX_SURVIVABILITY
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/jenkins_home/workspace/MyDeployment
+[Pipeline] {
+[Pipeline] git
+No credentials specified
+Cloning the remote Git repository
+Cloning repository https://github.com/prathima-ambati/terraform-docker-service.git
+ > git init /var/jenkins_home/workspace/MyDeployment # timeout=10
+Fetching upstream changes from https://github.com/prathima-ambati/terraform-docker-service.git
+ > git --version # timeout=10
+ > git fetch --tags --progress -- https://github.com/prathima-ambati/terraform-docker-service.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin.url https://github.com/prathima-ambati/terraform-docker-service.git # timeout=10
+ > git config --add remote.origin.fetch +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git config remote.origin.url https://github.com/prathima-ambati/terraform-docker-service.git # timeout=10
+Fetching upstream changes from https://github.com/prathima-ambati/terraform-docker-service.git
+ > git fetch --tags --progress -- https://github.com/prathima-ambati/terraform-docker-service.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/master^{commit} # timeout=10
+ > git rev-parse refs/remotes/origin/origin/master^{commit} # timeout=10
+Checking out Revision 405037882671e5a6c15140167eb2235f3f077a19 (refs/remotes/origin/master)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 405037882671e5a6c15140167eb2235f3f077a19 # timeout=10
+ > git branch -a -v --no-abbrev # timeout=10
+ > git checkout -b master 405037882671e5a6c15140167eb2235f3f077a19 # timeout=10
+Commit message: "Update main.tf"
+First time build. Skipping changelog.
+[Pipeline] stage
+[Pipeline] { (init)
+[Pipeline] sh (terraform init)
++ terraform init
+
+[0m[1mInitializing the backend...[0m
+
+[0m[1mInitializing provider plugins...[0m
+- Checking for available provider plugins...
+- Downloading plugin for provider "docker" (terraform-providers/docker) 2.6.0...
+
+The following providers do not have any version constraints in configuration,
+so the latest version was installed.
+
+To prevent automatic upgrades to new major versions that may contain breaking
+changes, it is recommended to add version = "..." constraints to the
+corresponding provider blocks in configuration, with the constraint strings
+suggested below.
+
+* provider.docker: version = "~> 2.6"
+
+[0m[1m[32mTerraform has been successfully initialized![0m[32m[0m
+[0m[32m
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (plan)
+[Pipeline] sh (terraform plan)
++ terraform plan -out=deploy_service -input=false -var ghost_image=ghost:alpine -var ghost_ext_port=8081
+[0m[1mRefreshing Terraform state in-memory prior to plan...[0m
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+[0m
+
+------------------------------------------------------------------------
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  [32m+[0m create
+[0m
+Terraform will perform the following actions:
+
+[1m  # docker_network.private_bridge_network[0m will be created[0m[0m
+[0m[32m  +[0m [0mresource "docker_network" "private_bridge_network" {
+      [32m+[0m [0m[1m[0mdriver[0m[0m      = "overlay"
+      [32m+[0m [0m[1m[0mid[0m[0m          = (known after apply)
+      [32m+[0m [0m[1m[0minternal[0m[0m    = true
+      [32m+[0m [0m[1m[0mipam_driver[0m[0m = "default"
+      [32m+[0m [0m[1m[0mname[0m[0m        = "ghost_mysql_internal_network"
+      [32m+[0m [0m[1m[0moptions[0m[0m     = (known after apply)
+      [32m+[0m [0m[1m[0mscope[0m[0m       = (known after apply)
+
+      [32m+[0m [0mipam_config {
+          [32m+[0m [0m[1m[0maux_address[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0mgateway[0m[0m     = (known after apply)
+          [32m+[0m [0m[1m[0mip_range[0m[0m    = (known after apply)
+          [32m+[0m [0m[1m[0msubnet[0m[0m      = (known after apply)
+        }
+    }
+
+[1m  # docker_network.public_bridge_network[0m will be created[0m[0m
+[0m[32m  +[0m [0mresource "docker_network" "public_bridge_network" {
+      [32m+[0m [0m[1m[0mdriver[0m[0m      = "overlay"
+      [32m+[0m [0m[1m[0mid[0m[0m          = (known after apply)
+      [32m+[0m [0m[1m[0minternal[0m[0m    = (known after apply)
+      [32m+[0m [0m[1m[0mipam_driver[0m[0m = "default"
+      [32m+[0m [0m[1m[0mname[0m[0m        = "ghost_public_network"
+      [32m+[0m [0m[1m[0moptions[0m[0m     = (known after apply)
+      [32m+[0m [0m[1m[0mscope[0m[0m       = (known after apply)
+
+      [32m+[0m [0mipam_config {
+          [32m+[0m [0m[1m[0maux_address[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0mgateway[0m[0m     = (known after apply)
+          [32m+[0m [0m[1m[0mip_range[0m[0m    = (known after apply)
+          [32m+[0m [0m[1m[0msubnet[0m[0m      = (known after apply)
+        }
+    }
+
+[1m  # docker_service.ghost-service[0m will be created[0m[0m
+[0m[32m  +[0m [0mresource "docker_service" "ghost-service" {
+      [32m+[0m [0m[1m[0mid[0m[0m     = (known after apply)
+      [32m+[0m [0m[1m[0mlabels[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m   = "ghost"
+
+      [32m+[0m [0mendpoint_spec {
+          [32m+[0m [0m[1m[0mmode[0m[0m = (known after apply)
+
+          [32m+[0m [0mports {
+              [32m+[0m [0m[1m[0mprotocol[0m[0m       = "tcp"
+              [32m+[0m [0m[1m[0mpublish_mode[0m[0m   = "ingress"
+              [32m+[0m [0m[1m[0mpublished_port[0m[0m = 8081
+              [32m+[0m [0m[1m[0mtarget_port[0m[0m    = 2368
+            }
+        }
+
+      [32m+[0m [0mmode {
+          [32m+[0m [0m[1m[0mglobal[0m[0m = (known after apply)
+
+          [32m+[0m [0mreplicated {
+              [32m+[0m [0m[1m[0mreplicas[0m[0m = (known after apply)
+            }
+        }
+
+      [32m+[0m [0mtask_spec {
+          [32m+[0m [0m[1m[0mforce_update[0m[0m   = (known after apply)
+          [32m+[0m [0m[1m[0mnetworks[0m[0m       = [
+              [32m+[0m [0m"ghost_mysql_internal_network",
+              [32m+[0m [0m"ghost_public_network",
+            ]
+          [32m+[0m [0m[1m[0mrestart_policy[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0mruntime[0m[0m        = (known after apply)
+
+          [32m+[0m [0mcontainer_spec {
+              [32m+[0m [0m[1m[0menv[0m[0m               = {
+                  [32m+[0m [0m"database__client"               = "mysql"
+                  [32m+[0m [0m"database__connection__database" = "ghost"
+                  [32m+[0m [0m"database__connection__host"     = "db"
+                  [32m+[0m [0m"database__connection__password" = "P4sSw0rd0!"
+                  [32m+[0m [0m"database__connection__user"     = "root"
+                }
+              [32m+[0m [0m[1m[0mimage[0m[0m             = "ghost:alpine"
+              [32m+[0m [0m[1m[0misolation[0m[0m         = "default"
+              [32m+[0m [0m[1m[0mstop_grace_period[0m[0m = (known after apply)
+
+              [32m+[0m [0mdns_config {
+                  [32m+[0m [0m[1m[0mnameservers[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0moptions[0m[0m     = (known after apply)
+                  [32m+[0m [0m[1m[0msearch[0m[0m      = (known after apply)
+                }
+
+              [32m+[0m [0mhealthcheck {
+                  [32m+[0m [0m[1m[0minterval[0m[0m     = (known after apply)
+                  [32m+[0m [0m[1m[0mretries[0m[0m      = (known after apply)
+                  [32m+[0m [0m[1m[0mstart_period[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mtest[0m[0m         = (known after apply)
+                  [32m+[0m [0m[1m[0mtimeout[0m[0m      = (known after apply)
+                }
+            }
+
+          [32m+[0m [0mplacement {
+              [32m+[0m [0m[1m[0mconstraints[0m[0m = (known after apply)
+              [32m+[0m [0m[1m[0mprefs[0m[0m       = (known after apply)
+
+              [32m+[0m [0mplatforms {
+                  [32m+[0m [0m[1m[0marchitecture[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mos[0m[0m           = (known after apply)
+                }
+            }
+
+          [32m+[0m [0mresources {
+              [32m+[0m [0mlimits {
+                  [32m+[0m [0m[1m[0mmemory_bytes[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mnano_cpus[0m[0m    = (known after apply)
+
+                  [32m+[0m [0mgeneric_resources {
+                      [32m+[0m [0m[1m[0mdiscrete_resources_spec[0m[0m = (known after apply)
+                      [32m+[0m [0m[1m[0mnamed_resources_spec[0m[0m    = (known after apply)
+                    }
+                }
+
+              [32m+[0m [0mreservation {
+                  [32m+[0m [0m[1m[0mmemory_bytes[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mnano_cpus[0m[0m    = (known after apply)
+
+                  [32m+[0m [0mgeneric_resources {
+                      [32m+[0m [0m[1m[0mdiscrete_resources_spec[0m[0m = (known after apply)
+                      [32m+[0m [0m[1m[0mnamed_resources_spec[0m[0m    = (known after apply)
+                    }
+                }
+            }
+        }
+    }
+
+[1m  # docker_service.mysql-service[0m will be created[0m[0m
+[0m[32m  +[0m [0mresource "docker_service" "mysql-service" {
+      [32m+[0m [0m[1m[0mid[0m[0m     = (known after apply)
+      [32m+[0m [0m[1m[0mlabels[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m   = "db"
+
+      [32m+[0m [0mendpoint_spec {
+          [32m+[0m [0m[1m[0mmode[0m[0m = (known after apply)
+
+          [32m+[0m [0mports {
+              [32m+[0m [0m[1m[0mname[0m[0m           = (known after apply)
+              [32m+[0m [0m[1m[0mprotocol[0m[0m       = (known after apply)
+              [32m+[0m [0m[1m[0mpublish_mode[0m[0m   = (known after apply)
+              [32m+[0m [0m[1m[0mpublished_port[0m[0m = (known after apply)
+              [32m+[0m [0m[1m[0mtarget_port[0m[0m    = (known after apply)
+            }
+        }
+
+      [32m+[0m [0mmode {
+          [32m+[0m [0m[1m[0mglobal[0m[0m = (known after apply)
+
+          [32m+[0m [0mreplicated {
+              [32m+[0m [0m[1m[0mreplicas[0m[0m = (known after apply)
+            }
+        }
+
+      [32m+[0m [0mtask_spec {
+          [32m+[0m [0m[1m[0mforce_update[0m[0m   = (known after apply)
+          [32m+[0m [0m[1m[0mnetworks[0m[0m       = [
+              [32m+[0m [0m"ghost_mysql_internal_network",
+            ]
+          [32m+[0m [0m[1m[0mrestart_policy[0m[0m = (known after apply)
+          [32m+[0m [0m[1m[0mruntime[0m[0m        = (known after apply)
+
+          [32m+[0m [0mcontainer_spec {
+              [32m+[0m [0m[1m[0menv[0m[0m               = {
+                  [32m+[0m [0m"MYSQL_ROOT_PASSWORD" = "P4sSw0rd0!"
+                }
+              [32m+[0m [0m[1m[0mimage[0m[0m             = "mysql:5.7"
+              [32m+[0m [0m[1m[0misolation[0m[0m         = "default"
+              [32m+[0m [0m[1m[0mstop_grace_period[0m[0m = (known after apply)
+
+              [32m+[0m [0mdns_config {
+                  [32m+[0m [0m[1m[0mnameservers[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0moptions[0m[0m     = (known after apply)
+                  [32m+[0m [0m[1m[0msearch[0m[0m      = (known after apply)
+                }
+
+              [32m+[0m [0mhealthcheck {
+                  [32m+[0m [0m[1m[0minterval[0m[0m     = (known after apply)
+                  [32m+[0m [0m[1m[0mretries[0m[0m      = (known after apply)
+                  [32m+[0m [0m[1m[0mstart_period[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mtest[0m[0m         = (known after apply)
+                  [32m+[0m [0m[1m[0mtimeout[0m[0m      = (known after apply)
+                }
+
+              [32m+[0m [0mmounts {
+                  [32m+[0m [0m[1m[0msource[0m[0m = "ghost_mysql_data"
+                  [32m+[0m [0m[1m[0mtarget[0m[0m = "/var/lib/mysql"
+                  [32m+[0m [0m[1m[0mtype[0m[0m   = "volume"
+                }
+            }
+
+          [32m+[0m [0mplacement {
+              [32m+[0m [0m[1m[0mconstraints[0m[0m = (known after apply)
+              [32m+[0m [0m[1m[0mprefs[0m[0m       = (known after apply)
+
+              [32m+[0m [0mplatforms {
+                  [32m+[0m [0m[1m[0marchitecture[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mos[0m[0m           = (known after apply)
+                }
+            }
+
+          [32m+[0m [0mresources {
+              [32m+[0m [0mlimits {
+                  [32m+[0m [0m[1m[0mmemory_bytes[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mnano_cpus[0m[0m    = (known after apply)
+
+                  [32m+[0m [0mgeneric_resources {
+                      [32m+[0m [0m[1m[0mdiscrete_resources_spec[0m[0m = (known after apply)
+                      [32m+[0m [0m[1m[0mnamed_resources_spec[0m[0m    = (known after apply)
+                    }
+                }
+
+              [32m+[0m [0mreservation {
+                  [32m+[0m [0m[1m[0mmemory_bytes[0m[0m = (known after apply)
+                  [32m+[0m [0m[1m[0mnano_cpus[0m[0m    = (known after apply)
+
+                  [32m+[0m [0mgeneric_resources {
+                      [32m+[0m [0m[1m[0mdiscrete_resources_spec[0m[0m = (known after apply)
+                      [32m+[0m [0m[1m[0mnamed_resources_spec[0m[0m    = (known after apply)
+                    }
+                }
+            }
+        }
+    }
+
+[1m  # docker_volume.mysql_data_volume[0m will be created[0m[0m
+[0m[32m  +[0m [0mresource "docker_volume" "mysql_data_volume" {
+      [32m+[0m [0m[1m[0mdriver[0m[0m     = (known after apply)
+      [32m+[0m [0m[1m[0mid[0m[0m         = (known after apply)
+      [32m+[0m [0m[1m[0mmountpoint[0m[0m = (known after apply)
+      [32m+[0m [0m[1m[0mname[0m[0m       = "ghost_mysql_data"
+    }
+
+[0m[1mPlan:[0m 5 to add, 0 to change, 0 to destroy.[0m
+
+------------------------------------------------------------------------
+
+This plan was saved to: deploy_service
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "deploy_service"
+
+[Pipeline] script
+[Pipeline] {
+[Pipeline] timeout
+Timeout set to expire in 10 min
+[Pipeline] {
+[Pipeline] input
+Deploy environment?
+Deploy or Abort
+Approved by admin
+[Pipeline] }
+[Pipeline] // timeout
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (apply)
+[Pipeline] sh (Deploy Infrastructure)
++ terraform apply -lock=false -input=false deploy_service
+[0m[1mdocker_network.public_bridge_network: Creating...[0m[0m
+[0m[1mdocker_network.private_bridge_network: Creating...[0m[0m
+[0m[1mdocker_volume.mysql_data_volume: Creating...[0m[0m
+[0m[1mdocker_volume.mysql_data_volume: Creation complete after 0s [id=ghost_mysql_data][0m[0m
+[0m[1mdocker_network.private_bridge_network: Creation complete after 2s [id=z5vmuu92dbj81yktip3bnlyqd][0m[0m
+[0m[1mdocker_network.public_bridge_network: Creation complete after 2s [id=baw3dbd0e8ng6nykd8abefhxk][0m[0m
+[0m[1mdocker_service.mysql-service: Creating...[0m[0m
+[0m[1mdocker_service.ghost-service: Creating...[0m[0m
+[0m[1mdocker_service.mysql-service: Creation complete after 6s [id=g98ssam3berzrv1pv0h7l0skr][0m[0m
+[0m[1mdocker_service.ghost-service: Creation complete after 6s [id=lh3xrczi0ntvpycqqj28ckh7b][0m[0m
+[0m[1m[32m
+Apply complete! Resources: 5 added, 0 changed, 0 destroyed.[0m
+[0m
+The state of your infrastructure has been saved to the path
+below. This state is required to modify and destroy your
+infrastructure, so keep it safe. To inspect the complete state
+use the `terraform show` command.
+
+State path: terraform.tfstate[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (show)
+[Pipeline] sh (terraform show)
++ terraform show
+[0m# docker_network.private_bridge_network:
+resource "docker_network" "private_bridge_network" {
+    [1m[0mattachable[0m[0m  = false
+    [1m[0mdriver[0m[0m      = "overlay"
+    [1m[0mid[0m[0m          = "z5vmuu92dbj81yktip3bnlyqd"
+    [1m[0mingress[0m[0m     = false
+    [1m[0minternal[0m[0m    = true
+    [1m[0mipam_driver[0m[0m = "default"
+    [1m[0mipv6[0m[0m        = false
+    [1m[0mname[0m[0m        = "ghost_mysql_internal_network"
+    [1m[0moptions[0m[0m     = {
+        "com.docker.network.driver.overlay.vxlanid_list" = "4104"
+    }
+    [1m[0mscope[0m[0m       = "swarm"
+
+    ipam_config {
+        [1m[0maux_address[0m[0m = {}
+        [1m[0mgateway[0m[0m     = "10.0.7.1"
+        [1m[0msubnet[0m[0m      = "10.0.7.0/24"
+    }
+}
+
+# docker_network.public_bridge_network:
+resource "docker_network" "public_bridge_network" {
+    [1m[0mattachable[0m[0m  = false
+    [1m[0mdriver[0m[0m      = "overlay"
+    [1m[0mid[0m[0m          = "baw3dbd0e8ng6nykd8abefhxk"
+    [1m[0mingress[0m[0m     = false
+    [1m[0minternal[0m[0m    = false
+    [1m[0mipam_driver[0m[0m = "default"
+    [1m[0mipv6[0m[0m        = false
+    [1m[0mname[0m[0m        = "ghost_public_network"
+    [1m[0moptions[0m[0m     = {
+        "com.docker.network.driver.overlay.vxlanid_list" = "4103"
+    }
+    [1m[0mscope[0m[0m       = "swarm"
+
+    ipam_config {
+        [1m[0maux_address[0m[0m = {}
+        [1m[0mgateway[0m[0m     = "10.0.6.1"
+        [1m[0msubnet[0m[0m      = "10.0.6.0/24"
+    }
+}
+
+# docker_service.ghost-service:
+resource "docker_service" "ghost-service" {
+    [1m[0mid[0m[0m     = "lh3xrczi0ntvpycqqj28ckh7b"
+    [1m[0mlabels[0m[0m = {}
+    [1m[0mname[0m[0m   = "ghost"
+
+    endpoint_spec {
+        [1m[0mmode[0m[0m = "vip"
+
+        ports {
+            [1m[0mprotocol[0m[0m       = "tcp"
+            [1m[0mpublish_mode[0m[0m   = "ingress"
+            [1m[0mpublished_port[0m[0m = 8081
+            [1m[0mtarget_port[0m[0m    = 2368
+        }
+    }
+
+    mode {
+        [1m[0mglobal[0m[0m = false
+
+        replicated {
+            [1m[0mreplicas[0m[0m = 1
+        }
+    }
+
+    task_spec {
+        [1m[0mforce_update[0m[0m   = 0
+        [1m[0mnetworks[0m[0m       = [
+            "ghost_mysql_internal_network",
+            "ghost_public_network",
+        ]
+        [1m[0mrestart_policy[0m[0m = {
+            "condition"    = "any"
+            "max_attempts" = "0"
+        }
+        [1m[0mruntime[0m[0m        = "container"
+
+        container_spec {
+            [1m[0menv[0m[0m               = {
+                "database__client"               = "mysql"
+                "database__connection__database" = "ghost"
+                "database__connection__host"     = "db"
+                "database__connection__password" = "P4sSw0rd0!"
+                "database__connection__user"     = "root"
+            }
+            [1m[0mimage[0m[0m             = "ghost:alpine@sha256:92ccd65240f66ad5835e554186b294006fee7dac9eceea0cbe13f7182eacfcb2"
+            [1m[0misolation[0m[0m         = "default"
+            [1m[0mread_only[0m[0m         = false
+            [1m[0mstop_grace_period[0m[0m = "0s"
+
+            dns_config {}
+
+            healthcheck {
+                [1m[0minterval[0m[0m     = "0s"
+                [1m[0mretries[0m[0m      = 0
+                [1m[0mstart_period[0m[0m = "0s"
+                [1m[0mtest[0m[0m         = []
+                [1m[0mtimeout[0m[0m      = "0s"
+            }
+        }
+
+        placement {
+            [1m[0mconstraints[0m[0m = []
+            [1m[0mprefs[0m[0m       = []
+
+            platforms {
+                [1m[0marchitecture[0m[0m = "amd64"
+                [1m[0mos[0m[0m           = "linux"
+            }
+        }
+
+        resources {
+        }
+    }
+}
+
+# docker_service.mysql-service:
+resource "docker_service" "mysql-service" {
+    [1m[0mid[0m[0m     = "g98ssam3berzrv1pv0h7l0skr"
+    [1m[0mlabels[0m[0m = {}
+    [1m[0mname[0m[0m   = "db"
+
+    endpoint_spec {
+        [1m[0mmode[0m[0m = "vip"
+    }
+
+    mode {
+        [1m[0mglobal[0m[0m = false
+
+        replicated {
+            [1m[0mreplicas[0m[0m = 1
+        }
+    }
+
+    task_spec {
+        [1m[0mforce_update[0m[0m   = 0
+        [1m[0mnetworks[0m[0m       = [
+            "ghost_mysql_internal_network",
+        ]
+        [1m[0mrestart_policy[0m[0m = {
+            "condition"    = "any"
+            "max_attempts" = "0"
+        }
+        [1m[0mruntime[0m[0m        = "container"
+
+        container_spec {
+            [1m[0menv[0m[0m               = {
+                "MYSQL_ROOT_PASSWORD" = "P4sSw0rd0!"
+            }
+            [1m[0mimage[0m[0m             = "mysql:5.7@sha256:5779c71a4730da36f013a23a437b5831198e68e634575f487d37a0639470e3a8"
+            [1m[0misolation[0m[0m         = "default"
+            [1m[0mread_only[0m[0m         = false
+            [1m[0mstop_grace_period[0m[0m = "0s"
+
+            dns_config {}
+
+            healthcheck {
+                [1m[0minterval[0m[0m     = "0s"
+                [1m[0mretries[0m[0m      = 0
+                [1m[0mstart_period[0m[0m = "0s"
+                [1m[0mtest[0m[0m         = []
+                [1m[0mtimeout[0m[0m      = "0s"
+            }
+
+            mounts {
+                [1m[0msource[0m[0m = "ghost_mysql_data"
+                [1m[0mtarget[0m[0m = "/var/lib/mysql"
+                [1m[0mtype[0m[0m   = "volume"
+            }
+        }
+
+        placement {
+            [1m[0mconstraints[0m[0m = []
+            [1m[0mprefs[0m[0m       = []
+
+            platforms {
+                [1m[0marchitecture[0m[0m = "amd64"
+                [1m[0mos[0m[0m           = "linux"
+            }
+        }
+
+        resources {
+        }
+    }
+}
+
+# docker_volume.mysql_data_volume:
+resource "docker_volume" "mysql_data_volume" {
+    [1m[0mdriver[0m[0m     = "local"
+    [1m[0mid[0m[0m         = "ghost_mysql_data"
+    [1m[0mmountpoint[0m[0m = "/var/snap/docker/common/var-lib-docker/volumes/ghost_mysql_data/_data"
+    [1m[0mname[0m[0m       = "ghost_mysql_data"
+}[0m[0m
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS
+
+**************************************************JENKINS LOGS EDS for Deploy *************************************************************************************************************************
+
+ docker service ls
+ID                  NAME                MODE                REPLICAS            IMAGE               PORTS
+aiho5ygsj1si        db                  replicated          1/1                 mysql:5.7
+kxb4ic57ar2u        ghost               replicated          1/1                 ghost:alpine        *:8081->2368/tcp
+
+
+sudo ufw status
+Status: inactive
+sudo ufw enable
+Command may disrupt existing ssh connections. Proceed with operation (y|n)? yes
+Firewall is active and enabled on system startup
+sudo ufw status
+Status: active
+sudo ufw allow 8081
+Rule added
+Rule added (v6)
+sudo ufw status
+Status: active
+
+To                         Action      From
+--                         ------      ----
+8081                       ALLOW       Anywhere
+8081 (v6)                  ALLOW       Anywhere (v6)
+
+sudo ufw status
+Status: active
+
+To                         Action      From
+--                         ------      ----
+8081                       ALLOW       Anywhere
+8081 (v6)                  ALLOW       Anywhere (v6)
+
+docker service inspect kxb4ic57ar2u
+[
+    {
+        "ID": "kxb4ic57ar2u870vijzkuqljf",
+        "Version": {
+            "Index": 1000
+        },
+        "CreatedAt": "2019-12-11T10:06:04.164697376Z",
+        "UpdatedAt": "2019-12-11T10:06:04.172463792Z",
+        "Spec": {
+            "Name": "ghost",
+            "Labels": {},
+            "TaskTemplate": {
+                "ContainerSpec": {
+                    "Image": "ghost:alpine@sha256:92ccd65240f66ad5835e554186b294006fee7dac9eceea0cbe13f7182eacfcb2",
+                    "Env": [
+                        "database__client=mysql",
+                        "database__connection__password=P4sSw0rd0!",
+                        "database__connection__user=root",
+                        "database__connection__database=ghost",
+                        "database__connection__host=db"
+                    ],
+                    "StopGracePeriod": 0,
+                    "Healthcheck": {},
+                    "DNSConfig": {},
+                    "Isolation": "default"
+                },
+                "Resources": {},
+                "RestartPolicy": {
+                    "Condition": "any",
+                    "Delay": 5000000000,
+                    "MaxAttempts": 0
+                },
+                "Placement": {
+                    "Platforms": [
+                        {
+                            "Architecture": "amd64",
+                            "OS": "linux"
+                        },
+                        {
+                            "OS": "linux"
+                        },
+                        {
+                            "OS": "linux"
+                        },
+                        {
+                            "Architecture": "arm64",
+                            "OS": "linux"
+                        },
+                        {
+                            "Architecture": "386",
+                            "OS": "linux"
+                        },
+                        {
+                            "Architecture": "ppc64le",
+                            "OS": "linux"
+                        },
+                        {
+                            "Architecture": "s390x",
+                            "OS": "linux"
+                        }
+                    ]
+                },
+                "Networks": [
+                    {
+                        "Target": "kq0h7n8e55jnzw185jad58tb8"
+                    },
+                    {
+                        "Target": "p6heq7ljhtdyjuoe0j0y02lip"
+                    }
+                ],
+                "ForceUpdate": 0,
+                "Runtime": "container"
+            },
+            "Mode": {
+                "Replicated": {
+                    "Replicas": 1
+                }
+            },
+            "UpdateConfig": {
+                "Parallelism": 1,
+                "FailureAction": "pause",
+                "Monitor": 5000000000,
+                "MaxFailureRatio": 0,
+                "Order": "stop-first"
+            },
+            "RollbackConfig": {
+                "Parallelism": 1,
+                "FailureAction": "pause",
+                "Monitor": 5000000000,
+                "MaxFailureRatio": 0,
+                "Order": "stop-first"
+            },
+            "EndpointSpec": {
+                "Mode": "vip",
+                "Ports": [
+                    {
+                        "Protocol": "tcp",
+                        "TargetPort": 2368,
+                        "PublishedPort": 8081,
+                        "PublishMode": "ingress"
+                    }
+                ]
+            }
+        },
+        "Endpoint": {
+            "Spec": {
+                "Mode": "vip",
+                "Ports": [
+                    {
+                        "Protocol": "tcp",
+                        "TargetPort": 2368,
+                        "PublishedPort": 8081,
+                        "PublishMode": "ingress"
+                    }
+                ]
+            },
+            "Ports": [
+                {
+                    "Protocol": "tcp",
+                    "TargetPort": 2368,
+                    "PublishedPort": 8081,
+                    "PublishMode": "ingress"
+                }
+            ],
+            "VirtualIPs": [
+                {
+                    "NetworkID": "lv5yvuwybh7e9a6030eyf90g2",
+                    "Addr": "10.255.0.37/16"
+                },
+                {
+                    "NetworkID": "kq0h7n8e55jnzw185jad58tb8",
+                    "Addr": "10.0.8.4/24"
+                },
+                {
+                    "NetworkID": "p6heq7ljhtdyjuoe0j0y02lip",
+                    "Addr": "10.0.9.2/24"
+                }
+            ]
+        }
+    }
+]
+
+
+ON Worker node:-
+
+curl 18.191.194.255:8081
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <title>Ghost</title>
+    <meta name="HandheldFriendly" content="True" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" type="text/css" href="/assets/built/screen.css?v=27773f2d39" />
+
+    <meta name="description" content="The professional publishing platform" />
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+    <link rel="canonical" href="http://localhost:2368/" />
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+
+    <meta property="og:site_name" content="Ghost" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ghost" />
+    <meta property="og:description" content="The professional publishing platform" />
+    <meta property="og:url" content="http://localhost:2368/" />
+    <meta property="og:image" content="https://static.ghost.org/v3.0.0/images/publication-cover.png" />
+    <meta property="article:publisher" content="https://www.facebook.com/ghost" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ghost" />
+    <meta name="twitter:description" content="The professional publishing platform" />
+    <meta name="twitter:url" content="http://localhost:2368/" />
+    <meta name="twitter:image" content="https://static.ghost.org/v3.0.0/images/publication-cover.png" />
+    <meta name="twitter:site" content="tryghost" />
+    <meta property="og:image:width" content="2709" />
+    <meta property="og:image:height" content="938" />
+
+    <script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "publisher": {
+        "@type": "Organization",
+        "name": "Ghost",
+        "logo": "https://static.ghost.org/v1.0.0/images/ghost-logo.svg"
+    },
+    "url": "http://localhost:2368/",
+    "image": {
+        "@type": "ImageObject",
+        "url": "https://static.ghost.org/v3.0.0/images/publication-cover.png",
+        "width": 2709,
+        "height": 938
+    },
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "http://localhost:2368/"
+    },
+    "description": "The professional publishing platform"
+}
+    </script>
+
+    <meta name="generator" content="Ghost 3.1" />
+    <link rel="alternate" type="application/rss+xml" title="Ghost" href="http://localhost:2368/rss/" />
+
+</head>
+<body class="home-template">
+
+    <div class="site-wrapper">
+
+
+<header class="site-home-header">
+
+
+<style type="text/css">
+    .responsive-header-img {
+        background-image: url(https://static.ghost.org/v3.0.0/images/publication-cover.png);
+    }
+
+    @media(max-width: 1000px) {
+        .responsive-header-img {
+            background-image: url(https://static.ghost.org/v3.0.0/images/publication-cover.png);
+            background-image: -webkit-image-set(url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 1x,
+                url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 2x);
+            background-image: image-set(url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 1x,
+                url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 2x);
+        }
+    }
+
+    @media(max-width: 600px) {
+        .responsive-header-img {
+            background-image: url(https://static.ghost.org/v3.0.0/images/publication-cover.png);
+            background-image: -webkit-image-set(url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 1x,
+                url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 2x);
+            background-image: image-set(url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 1x,
+                url(https://static.ghost.org/v3.0.0/images/publication-cover.png) 2x);
+        }
+    }
+</style>
+<div class="outer site-header-background responsive-header-img">
+
+
+        <div class="inner">
+            <nav class="site-nav">
+    <div class="site-nav-left-wrapper">
+        <div class="site-nav-left">
+                <a class="site-nav-logo" href="http://localhost:2368"><img src="https://static.ghost.org/v1.0.0/images/ghost-logo.svg" alt="Ghost" /></a>
+            <div class="site-nav-content">
+                    <ul class="nav" role="menu">
+    <li class="nav-home nav-current" role="menuitem"><a href="http://localhost:2368/">Home</a></li>
+    <li class="nav-tag" role="menuitem"><a href="http://localhost:2368/tag/getting-started/">Tag</a></li>
+    <li class="nav-author" role="menuitem"><a href="http://localhost:2368/author/ghost/">Author</a></li>
+    <li class="nav-help" role="menuitem"><a href="https://ghost.org/docs/">Help</a></li>
+</ul>
+
+            </div>
+        </div>
+    </div>
+    <div class="site-nav-right">
+            <div class="social-links">
+                    <a class="social-link social-link-fb" href="https://www.facebook.com/ghost" title="Facebook" target="_blank" rel="noopener"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M16 0c8.837 0 16 7.163 16 16s-7.163 16-16 16S0 24.837 0 16 7.163 0 16 0zm5.204 4.911h-3.546c-2.103 0-4.443.885-4.443 3.934.01 1.062 0 2.08 0 3.225h-2.433v3.872h2.509v11.147h4.61v-11.22h3.042l.275-3.81h-3.397s.007-1.695 0-2.187c0-1.205 1.253-1.136 1.329-1.136h2.054V4.911z" /></svg></a>
+                    <a class="social-link social-link-tw" href="https://twitter.com/tryghost" title="Twitter" target="_blank" rel="noopener"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M30.063 7.313c-.813 1.125-1.75 2.125-2.875 2.938v.75c0 1.563-.188 3.125-.688 4.625a15.088 15.088 0 0 1-2.063 4.438c-.875 1.438-2 2.688-3.25 3.813a15.015 15.015 0 0 1-4.625 2.563c-1.813.688-3.75 1-5.75 1-3.25 0-6.188-.875-8.875-2.625.438.063.875.125 1.375.125 2.688 0 5.063-.875 7.188-2.5-1.25 0-2.375-.375-3.375-1.125s-1.688-1.688-2.063-2.875c.438.063.813.125 1.125.125.5 0 1-.063 1.5-.25-1.313-.25-2.438-.938-3.313-1.938a5.673 5.673 0 0 1-1.313-3.688v-.063c.813.438 1.688.688 2.625.688a5.228 5.228 0 0 1-1.875-2c-.5-.875-.688-1.813-.688-2.75 0-1.063.25-2.063.75-2.938 1.438 1.75 3.188 3.188 5.25 4.25s4.313 1.688 6.688 1.813a5.579 5.579 0 0 1 1.5-5.438c1.125-1.125 2.5-1.688 4.125-1.688s3.063.625 4.188 1.813a11.48 11.48 0 0 0 3.688-1.375c-.438 1.375-1.313 2.438-2.563 3.188 1.125-.125 2.188-.438 3.313-.875z"/></svg>
+</a>
+            </div>
+                <a class="rss-button" href="https://feedly.com/i/subscription/feed/http://localhost:2368/rss/" title="RSS" target="_blank" rel="noopener"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z"/></svg>
+</a>
+
+    </div>
+</nav>
+            <div class="site-header-content">
+                <h1 class="site-title">
+                        <img class="site-logo" src="https://static.ghost.org/v1.0.0/images/ghost-logo.svg" alt="Ghost" />
+                </h1>
+                <h2 class="site-description">The professional publishing platform</h2>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main id="site-main" class="site-main outer">
+    <div class="inner posts">
+
+        <div class="post-feed">
+
+                <article class="post-card post tag-getting-started post-card-large">
+
+    <a class="post-card-image-link" href="/welcome/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/welcome-to-ghost.png 300w,
+                    https://static.ghost.org/v3.0.0/images/welcome-to-ghost.png 600w,
+                    https://static.ghost.org/v3.0.0/images/welcome-to-ghost.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/welcome-to-ghost.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/welcome-to-ghost.png"
+            alt="Welcome to Ghost"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/welcome/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Welcome to Ghost</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>Welcome, it's great to have you here. We know that first impressions are important, so we've populated your new site with some initial getting started posts that will help you get familiar with everything in no time.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 1 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+
+                <article class="post-card post tag-getting-started ">
+
+    <a class="post-card-image-link" href="/the-editor/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/writing-posts-with-ghost.png 300w,
+                    https://static.ghost.org/v3.0.0/images/writing-posts-with-ghost.png 600w,
+                    https://static.ghost.org/v3.0.0/images/writing-posts-with-ghost.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/writing-posts-with-ghost.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/writing-posts-with-ghost.png"
+            alt="Writing posts with Ghost ??"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/the-editor/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Writing posts with Ghost ??</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>Discover familiar formatting options in a functional toolbar and the ability to add dynamic content seamlessly.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 3 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+
+                <article class="post-card post tag-getting-started ">
+
+    <a class="post-card-image-link" href="/publishing-options/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/publishing-options.png 300w,
+                    https://static.ghost.org/v3.0.0/images/publishing-options.png 600w,
+                    https://static.ghost.org/v3.0.0/images/publishing-options.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/publishing-options.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/publishing-options.png"
+            alt="Publishing options"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/publishing-options/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Publishing options</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>The Ghost editor post settings menu has everything you need to fully optimise and distribute your content effectively.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 2 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+
+                <article class="post-card post tag-getting-started ">
+
+    <a class="post-card-image-link" href="/admin-settings/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/admin-settings.png 300w,
+                    https://static.ghost.org/v3.0.0/images/admin-settings.png 600w,
+                    https://static.ghost.org/v3.0.0/images/admin-settings.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/admin-settings.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/admin-settings.png"
+            alt="Managing admin settings"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/admin-settings/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Managing admin settings</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>There are a couple of things to do next while you're getting set up: making your site private and inviting your team.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 2 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+
+                <article class="post-card post tag-getting-started ">
+
+    <a class="post-card-image-link" href="/organising-content/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/organising-your-content.png 300w,
+                    https://static.ghost.org/v3.0.0/images/organising-your-content.png 600w,
+                    https://static.ghost.org/v3.0.0/images/organising-your-content.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/organising-your-content.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/organising-your-content.png"
+            alt="Organising your content"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/organising-content/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Organising your content</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>Ghost has a flexible organisational taxonomy called tags and the ability to create custom site structures using dynamic routes.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 2 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+
+                <article class="post-card post tag-getting-started ">
+
+    <a class="post-card-image-link" href="/apps-integrations/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/app-integrations.png 300w,
+                    https://static.ghost.org/v3.0.0/images/app-integrations.png 600w,
+                    https://static.ghost.org/v3.0.0/images/app-integrations.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/app-integrations.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/app-integrations.png"
+            alt="Apps &amp; integrations"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/apps-integrations/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Apps &amp; integrations</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>Work with all your favourite apps and tools or create your own custom integrations using the Ghost API.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 2 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+
+                <article class="post-card post tag-getting-started post-card-large">
+
+    <a class="post-card-image-link" href="/themes/">
+        <img class="post-card-image"
+            srcset="https://static.ghost.org/v3.0.0/images/creating-a-custom-theme.png 300w,
+                    https://static.ghost.org/v3.0.0/images/creating-a-custom-theme.png 600w,
+                    https://static.ghost.org/v3.0.0/images/creating-a-custom-theme.png 1000w,
+                    https://static.ghost.org/v3.0.0/images/creating-a-custom-theme.png 2000w"
+            sizes="(max-width: 1000px) 400px, 700px"
+            src="https://static.ghost.org/v3.0.0/images/creating-a-custom-theme.png"
+            alt="Creating a custom theme"
+        />
+    </a>
+
+    <div class="post-card-content">
+
+        <a class="post-card-content-link" href="/themes/">
+
+            <header class="post-card-header">
+                    <div class="post-card-primary-tag">Getting Started</div>
+                <h2 class="post-card-title">Creating a custom theme</h2>
+            </header>
+
+            <section class="post-card-excerpt">
+                    <p>Ghost comes with a beautiful default theme designed for publishers which can easily be adapted for most purposes, or you can build a custom theme to suit your needs.</p>
+            </section>
+
+        </a>
+
+        <footer class="post-card-meta">
+            <ul class="author-list">
+                <li class="author-list-item">
+
+                    <div class="author-name-tooltip">
+                        Ghost
+                    </div>
+
+                    <a href="/author/ghost/" class="static-avatar">
+                        <img class="author-profile-image" src="https://static.ghost.org/v3.0.0/images/ghost.png" alt="Ghost" />
+                    </a>
+                </li>
+            </ul>
+            <div class="post-card-byline-content">
+                <span><a href="/author/ghost/">Ghost</a></span>
+                <span class="post-card-byline-date"><time datetime="2019-12-11">11 Dec 2019</time> <span class="bull">&bull;</span> 2 min read</span>
+            </div>
+        </footer>
+
+    </div>
+
+</article>
+
+        </div>
+
+    </div>
+</main>
+
+<div class="outer site-nav-main">
+    <div class="inner">
+        <nav class="site-nav">
+    <div class="site-nav-left-wrapper">
+        <div class="site-nav-left">
+                <a class="site-nav-logo" href="http://localhost:2368"><img src="https://static.ghost.org/v1.0.0/images/ghost-logo.svg" alt="Ghost" /></a>
+            <div class="site-nav-content">
+                    <ul class="nav" role="menu">
+    <li class="nav-home nav-current" role="menuitem"><a href="http://localhost:2368/">Home</a></li>
+    <li class="nav-tag" role="menuitem"><a href="http://localhost:2368/tag/getting-started/">Tag</a></li>
+    <li class="nav-author" role="menuitem"><a href="http://localhost:2368/author/ghost/">Author</a></li>
+    <li class="nav-help" role="menuitem"><a href="https://ghost.org/docs/">Help</a></li>
+</ul>
+
+            </div>
+        </div>
+    </div>
+    <div class="site-nav-right">
+            <div class="social-links">
+                    <a class="social-link social-link-fb" href="https://www.facebook.com/ghost" title="Facebook" target="_blank" rel="noopener"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M16 0c8.837 0 16 7.163 16 16s-7.163 16-16 16S0 24.837 0 16 7.163 0 16 0zm5.204 4.911h-3.546c-2.103 0-4.443.885-4.443 3.934.01 1.062 0 2.08 0 3.225h-2.433v3.872h2.509v11.147h4.61v-11.22h3.042l.275-3.81h-3.397s.007-1.695 0-2.187c0-1.205 1.253-1.136 1.329-1.136h2.054V4.911z" /></svg></a>
+                    <a class="social-link social-link-tw" href="https://twitter.com/tryghost" title="Twitter" target="_blank" rel="noopener"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M30.063 7.313c-.813 1.125-1.75 2.125-2.875 2.938v.75c0 1.563-.188 3.125-.688 4.625a15.088 15.088 0 0 1-2.063 4.438c-.875 1.438-2 2.688-3.25 3.813a15.015 15.015 0 0 1-4.625 2.563c-1.813.688-3.75 1-5.75 1-3.25 0-6.188-.875-8.875-2.625.438.063.875.125 1.375.125 2.688 0 5.063-.875 7.188-2.5-1.25 0-2.375-.375-3.375-1.125s-1.688-1.688-2.063-2.875c.438.063.813.125 1.125.125.5 0 1-.063 1.5-.25-1.313-.25-2.438-.938-3.313-1.938a5.673 5.673 0 0 1-1.313-3.688v-.063c.813.438 1.688.688 2.625.688a5.228 5.228 0 0 1-1.875-2c-.5-.875-.688-1.813-.688-2.75 0-1.063.25-2.063.75-2.938 1.438 1.75 3.188 3.188 5.25 4.25s4.313 1.688 6.688 1.813a5.579 5.579 0 0 1 1.5-5.438c1.125-1.125 2.5-1.688 4.125-1.688s3.063.625 4.188 1.813a11.48 11.48 0 0 0 3.688-1.375c-.438 1.375-1.313 2.438-2.563 3.188 1.125-.125 2.188-.438 3.313-.875z"/></svg>
+</a>
+            </div>
+                <a class="rss-button" href="https://feedly.com/i/subscription/feed/http://localhost:2368/rss/" title="RSS" target="_blank" rel="noopener"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z"/></svg>
+</a>
+
+    </div>
+</nav>
+    </div>
+</div>
+
+
+        <footer class="site-footer outer">
+            <div class="site-footer-content inner">
+                <section class="copyright"><a href="http://localhost:2368">Ghost</a> &copy; 2019</section>
+                <nav class="site-footer-nav">
+                    <a href="http://localhost:2368">Latest Posts</a>
+                    <a href="https://www.facebook.com/ghost" target="_blank" rel="noopener">Facebook</a>
+                    <a href="https://twitter.com/tryghost" target="_blank" rel="noopener">Twitter</a>
+                    <a href="https://ghost.org" target="_blank" rel="noopener">Ghost</a>
+                </nav>
+            </div>
+        </footer>
+
+    </div>
+
+
+    <script
+        src="https://code.jquery.com/jquery-3.4.1.min.js"
+        integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+        crossorigin="anonymous">
+    </script>
+    <script src="/assets/built/casper.js?v=27773f2d39"></script>
+
+    <script>
+        // Parse the URL parameter
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[\[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+
+        // Give the parameter a variable name
+        var action = getParameterByName('action');
+
+        $(document).ready(function () {
+            if (action == 'subscribe') {
+                $('body').addClass("subscribe-success");
+            }
+
+            $('.subscribe-success-message .subscribe-close').click(function () {
+                $('.subscribe-success-message').addClass('close');
+            });
+
+            // Reset form on opening subscrion overlay
+            $('.subscribe-button').click(function() {
+                $('.subscribe-overlay form').removeClass();
+                $('.subscribe-email').val('');
+            });
+        });
+    </script>
+
+    <script>
+
+    // NOTE: Scroll performance is poor in Safari
+    // - this appears to be due to the events firing much more slowly in Safari.
+    //   Dropping the scroll event and using only a raf loop results in smoother
+    //   scrolling but continuous processing even when not scrolling
+    $(document).ready(function () {
+
+        var nav = document.querySelector('.site-nav-main .site-nav');
+        var feed = document.querySelector('.post-feed');
+
+        var lastScrollY = window.scrollY;
+        var lastWindowHeight = window.innerHeight;
+        var lastDocumentHeight = $(document).height();
+        var ticking = false;
+
+        function onScroll() {
+            lastScrollY = window.scrollY;
+            requestTick();
+        }
+
+        function onResize() {
+            lastWindowHeight = window.innerHeight;
+            lastDocumentHeight = $(document).height();
+            requestTick();
+        }
+
+        function requestTick() {
+            if (!ticking) {
+                requestAnimationFrame(update);
+            }
+            ticking = true;
+        }
+
+        function update() {
+            var trigger = feed.getBoundingClientRect().top + window.scrollY;
+            var progressMax = lastDocumentHeight - lastWindowHeight;
+
+            // show/hide nav
+            if (lastScrollY >= trigger - 20) {
+                nav.classList.add('fixed-nav-active');
+            } else {
+                nav.classList.remove('fixed-nav-active');
+            }
+
+            ticking = false;
+        }
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onResize, false);
+
+        update();
+
+    });
+</script>
+
+
+
+
+</body>
+</html>
+
+
+
+After hitting below URL,you will get below page
+
+http://192.91.194.154:8081/
