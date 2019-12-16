@@ -1,0 +1,67 @@
+Setting up Kubernetes Installing Terraform
+In this lesson we will setup a Kuberentes master and install Terraform.
+
+Add the following to kube-config.yml:
+
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: ClusterConfiguration
+kubernetesVersion: "v1.13.5"
+networking:
+  podSubnet: 10.244.0.0/16
+apiServer:
+  extraArgs:
+    service-node-port-range: 8000-31274
+Initialize Kubernetes:
+
+sudo kubeadm init --config kube-config.yml
+Copy admin.conf to your home directory:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+Install Flannel:
+
+sudo kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+Untaint the Kubernetes Master:
+
+kubectl taint nodes --all node-role.kubernetes.io/master-
+Install Terraform
+Terraform will be installed on the Swarm manager.
+
+Install Terraform 0.11.13:
+
+sudo curl -O https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip
+sudo unzip terraform_0.11.13_linux_amd64.zip -d /usr/local/bin/
+Test the Terraform installation:
+
+terraform version
+
+Download Terraform (https://www.terraform.io/downloads.html)
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+Using Kubernetes Playground
+-------------------------------
+master $ kubectl get nodes
+NAME     STATUS   ROLES    AGE    VERSION
+master   Ready    master   113m   v1.14.0
+node01   Ready    <none>   113m   v1.14.0
+
+master $ sudo curl -O https://releases.hashicorp.com/terraform/0.11.13/terraform_0.11.13_linux_amd64.zip  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 20.1M  100 20.1M    0     0  9274k      0  0:00:02  0:00:02 --:--:-- 9277k
+
+master $ ls -ltr
+total 20644
+drwxr-xr-x 4 root root     4096 Aug  8 13:07 go
+-rw-r--r-- 1 root root      194 Dec 15 14:14 kube-config.yml
+-rw-r--r-- 1 root root 21128942 Dec 15 14:20 terraform_0.11.13_linux_amd64.zip
+
+master $ sudo unzip terraform_0.11.13_linux_amd64.zip -d /usr/local/bin/
+Archive:  terraform_0.11.13_linux_amd64.zip
+  inflating: /usr/local/bin/terraformmaster $ terraform version
+Terraform v0.11.13
+
+Your version of Terraform is out of date! The latest version
+is 0.12.18. You can update by downloading from www.terraform.io/downloads.html
